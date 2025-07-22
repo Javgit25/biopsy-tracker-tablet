@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Save, FileText, Eye } from 'lucide-react';
+import { ArrowLeft, Save, FileText, Eye, Check, Package, Hash, Shield, TestTube } from 'lucide-react';
 import { BiopsyForm } from '../../types';
 import { serviciosAdicionales, giemsaOptions } from '../../constants/services';
 
@@ -20,15 +20,106 @@ export const Step7: React.FC<Step7Props> = ({
   onFinishDailyReport,
   onOpenVirtualKeyboard
 }) => {
-  // Debug: Verificar que las funciones se reciben correctamente
+  // Colores del diseño
+  const colors = {
+    primaryBlue: '#4F76F6',
+    darkBlue: '#3B5BDB',
+    lightBlue: '#7C9BFF',
+    yellow: '#FFE066',
+    green: '#51CF66',
+    white: '#FFFFFF',
+    lightGray: '#F8FAFC',
+    darkGray: '#64748B'
+  };
+
+  const currentStep = 7;
+  const totalSteps = 7;
+
+  // ✅ DETERMINAR SI ES PAP O CITOLOGÍA
+  const isPAPSelected = biopsyForm.tissueType === 'PAP';
+  const isCitologiaSelected = biopsyForm.tissueType === 'Citología';
+  const isPapOrCitologia = isPAPSelected || isCitologiaSelected;
+
+  // ✅ FUNCIONES PARA OBTENER TEXTOS DINÁMICOS
+  const getTitle = () => {
+    if (isPAPSelected) return 'Vista Previa de los PAP';
+    if (isCitologiaSelected) return 'Vista Previa de las Citologías';
+    return 'Vista Previa de la Biopsia';
+  };
+
+  const getSubtitle = () => {
+    if (isPAPSelected) return 'Revisa todos los datos de los PAP ingresados';
+    if (isCitologiaSelected) return 'Revisa todos los datos de las Citologías ingresados';
+    return 'Revisa todos los datos ingresados';
+  };
+
+  const getNumberLabel = () => {
+    if (isPAPSelected) return 'Número de PAP';
+    if (isCitologiaSelected) return 'Número de Citología';
+    return 'Número de Biopsia';
+  };
+
+  const getTissueLabel = () => {
+    if (isPAPSelected || isCitologiaSelected) return 'Tipo de Estudio';
+    return 'Tipo de Tejido';
+  };
+
+  const getCassettesLabel = () => {
+    if (isPAPSelected) return 'Cantidad de Vidrios';
+    if (isCitologiaSelected) return 'Cantidad de Vidrios';
+    return 'Cassettes';
+  };
+
+  // Debug logs
   React.useEffect(() => {
     console.log('Step7 - Props recibidas:');
     console.log('- biopsyForm:', biopsyForm);
     console.log('- onSave:', typeof onSave);
     console.log('- onFinishDailyReport:', typeof onFinishDailyReport);
-    console.log('- biopsyForm.number:', biopsyForm.number);
-    console.log('- biopsyForm.tissueType:', biopsyForm.tissueType);
   }, [biopsyForm, onSave, onFinishDailyReport]);
+
+  // Barra de progreso
+  const ProgressBar = () => (
+    <div style={{
+      padding: '12px 24px',
+      backgroundColor: colors.white,
+      borderBottom: '1px solid #E2E8F0'
+    }}>
+      <div style={{
+        width: '100%',
+        height: '6px',
+        backgroundColor: '#E2E8F0',
+        borderRadius: '3px',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          width: `${(currentStep / totalSteps) * 100}%`,
+          height: '100%',
+          background: colors.primaryBlue,
+          borderRadius: '3px',
+          transition: 'width 0.3s ease'
+        }} />
+      </div>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        marginTop: '8px',
+        fontSize: '12px'
+      }}>
+        {['Número', 'Tejido', 'Tipo', 'Cassettes', 'Trozos', 'Servicios', 'Confirmar'].map((step, index) => (
+          <span 
+            key={step}
+            style={{
+              color: index < currentStep ? colors.primaryBlue : index === currentStep - 1 ? '#1F2937' : colors.darkGray,
+              fontWeight: index === currentStep - 1 ? '600' : '500'
+            }}
+          >
+            {step}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 
   const handleSave = () => {
     console.log('Step7 - Botón Guardar Biopsia presionado');
@@ -47,7 +138,7 @@ export const Step7: React.FC<Step7Props> = ({
     onOpenVirtualKeyboard('full', 'observations', biopsyForm.observations);
   };
 
-  // Función para obtener servicios activos con formato correcto
+  // ✅ FUNCIÓN CORREGIDA PARA EVITAR DUPLICADOS DE GIEMSA
   const getServiciosActivos = () => {
     const serviciosActivos: string[] = [];
     if (biopsyForm.servicios) {
@@ -57,17 +148,10 @@ export const Step7: React.FC<Step7Props> = ({
           if (servicio) {
             let servicioLabel = servicio.label;
             
-            // Agregar cantidad para cortes en blanco
-            if (key === 'corteBlancoIHQ') {
-              const quantity = biopsyForm.servicios.corteBlancoIHQQuantity || 1;
-              servicioLabel += ` (${quantity} corte${quantity !== 1 ? 's' : ''})`;
-            } else if (key === 'corteBlancoComun') {
-              const quantity = biopsyForm.servicios.corteBlancoComunQuantity || 1;
-              servicioLabel += ` (${quantity} corte${quantity !== 1 ? 's' : ''})`;
-            }
-            
-            // Agregar sub-opciones de Giemsa si están seleccionadas
+            // ✅ MANEJO ESPECIAL PARA GIEMSA/PAS/MASSON CON SUBMENÚ
             if (key === 'giemsaPASMasson' && biopsyForm.servicios.giemsaOptions) {
+              console.log('🔍 Procesando Giemsa con opciones:', biopsyForm.servicios.giemsaOptions);
+              
               const giemsaSelected = Object.entries(biopsyForm.servicios.giemsaOptions)
                 .filter(([_, selected]) => selected)
                 .map(([optionKey, _]) => {
@@ -75,21 +159,49 @@ export const Step7: React.FC<Step7Props> = ({
                   return option ? option.label : optionKey;
                 });
               
+              console.log('🎨 Opciones Giemsa seleccionadas:', giemsaSelected);
+              
               if (giemsaSelected.length > 0) {
-                servicioLabel = `${giemsaSelected.join(', ')}`;
+                // ✅ MOSTRAR SOLO LAS OPCIONES ESPECÍFICAS SELECCIONADAS
+                servicioLabel = giemsaSelected.join(', ');
+                console.log('✅ Etiqueta final de Giemsa:', servicioLabel);
+              } else {
+                // Si no hay sub-opciones seleccionadas, no mostrar nada
+                console.log('⚠️ Giemsa sin sub-opciones seleccionadas, omitiendo...');
+                return;
               }
+            }
+            // ✅ AGREGAR CANTIDAD PARA CORTES EN BLANCO
+            else if (key === 'corteBlancoIHQ') {
+              const quantity = biopsyForm.servicios.corteBlancoIHQQuantity || 1;
+              servicioLabel += ` (${quantity} corte${quantity !== 1 ? 's' : ''})`;
+            } else if (key === 'corteBlancoComun') {
+              const quantity = biopsyForm.servicios.corteBlancoComunQuantity || 1;
+              servicioLabel += ` (${quantity} corte${quantity !== 1 ? 's' : ''})`;
             }
             
             serviciosActivos.push(servicioLabel);
+            console.log('✅ Servicio agregado:', servicioLabel);
           }
         }
       });
     }
+    
+    console.log('📋 Servicios activos finales:', serviciosActivos);
     return serviciosActivos;
   };
 
-  // Función para obtener números de cassettes formateados
+  // ✅ FUNCIÓN PARA OBTENER NÚMEROS DE CASSETTES O VIDRIOS
   const getCassettesNumbers = () => {
+    // ✅ PARA PAP/CITOLOGÍA MOSTRAR CANTIDAD DE VIDRIOS
+    if (isPAPSelected) {
+      return [biopsyForm.papQuantity?.toString() || '0'];
+    }
+    if (isCitologiaSelected) {
+      return [biopsyForm.citologiaQuantity?.toString() || '0'];
+    }
+    
+    // Para biopsias normales, mostrar números de cassettes
     if (!biopsyForm.cassettesNumbers || biopsyForm.cassettesNumbers.length === 0) {
       return [biopsyForm.number];
     }
@@ -118,176 +230,593 @@ export const Step7: React.FC<Step7Props> = ({
   const cassettesNumbers = getCassettesNumbers();
 
   return (
-    <div className="p-4 space-y-6">
-      {/* Header */}
-      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-            <Eye className="h-6 w-6 text-green-600" />
+    <div style={{ 
+      minHeight: '100vh', 
+      background: colors.lightGray,
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden'
+    }}>
+      
+      {/* Barra de Progreso */}
+      <ProgressBar />
+      
+      {/* Header Compacto */}
+      <div style={{
+        backgroundColor: colors.white,
+        padding: '12px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '16px',
+        borderBottom: '1px solid #E2E8F0'
+      }}>
+        
+        <div style={{ position: 'relative' }}>
+          <div style={{
+            width: '50px',
+            height: '50px',
+            background: colors.primaryBlue,
+            borderRadius: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(79, 118, 246, 0.3)'
+          }}>
+            <Eye style={{ width: '26px', height: '26px', color: colors.white }} />
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800">Resumen Final</h3>
-            <p className="text-sm text-gray-600">Revisa y confirma los datos antes de guardar</p>
-          </div>
-        </div>
-
-        {/* Vista previa de la biopsia */}
-        <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-          {/* Información básica */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-600 font-medium">Número de Biopsia</p>
-              <p className="text-lg font-bold text-blue-600">#{biopsyForm.number}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-600 font-medium">Tipo</p>
-              <p className="text-lg font-bold text-purple-600">{biopsyForm.type}</p>
-            </div>
-          </div>
-
-          {/* Tejido */}
-          <div>
-            <p className="text-xs text-gray-600 font-medium mb-1">Tipo de Tejido</p>
-            <p className="text-sm font-medium text-gray-800">{getTissueTypeDisplay()}</p>
-          </div>
-
-          {/* Cassettes y trozos */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-600 font-medium">Cassettes</p>
-              <p className="text-sm font-medium text-gray-800">{biopsyForm.cassettes}</p>
-            </div>
-            {biopsyForm.pieces && (
-              <div>
-                <p className="text-xs text-gray-600 font-medium">Trozos</p>
-                <p className="text-sm font-medium text-gray-800">{biopsyForm.pieces}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Números de cassettes */}
-          {cassettesNumbers.length > 0 && (
-            <div>
-              <p className="text-xs text-gray-600 font-medium mb-2">Números de Cassettes</p>
-              <div className="flex flex-wrap gap-2">
-                {cassettesNumbers.map((number, index) => (
-                  <span
-                    key={index}
-                    className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
-                  >
-                    {number}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Desclasificar */}
-          {biopsyForm.declassify && biopsyForm.declassify !== 'No' && (
-            <div>
-              <p className="text-xs text-gray-600 font-medium">Desclasificar</p>
-              <p className="text-sm font-medium text-orange-600">{biopsyForm.declassify}</p>
-            </div>
-          )}
-
-          {/* Servicios adicionales */}
-          {serviciosActivos.length > 0 && (
-            <div>
-              <p className="text-xs text-gray-600 font-medium mb-2">Servicios Adicionales</p>
-              <div className="space-y-1">
-                {serviciosActivos.map((servicio, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                    <span className="text-sm text-purple-700 font-medium">{servicio}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Observaciones */}
-      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-        <div className="mb-3">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Observaciones (Opcional)
-          </label>
-          <div 
-            onClick={handleObservationsClick}
-            className="w-full min-h-[80px] p-3 border border-gray-300 rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
-          >
-            {biopsyForm.observations ? (
-              <p className="text-gray-800 text-sm">{biopsyForm.observations}</p>
-            ) : (
-              <p className="text-gray-500 text-sm italic">Toca aquí para agregar observaciones...</p>
-            )}
+          <div style={{
+            position: 'absolute',
+            top: '-4px',
+            right: '-4px',
+            width: '20px',
+            height: '20px',
+            backgroundColor: colors.green,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: `2px solid ${colors.white}`,
+            color: colors.white,
+            fontSize: '12px',
+            fontWeight: 'bold'
+          }}>
+            7
           </div>
         </div>
-      </div>
 
-      {/* Información importante */}
-      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-        <h4 className="font-medium text-blue-800 mb-2">ℹ️ Información importante:</h4>
-        <ul className="text-sm text-blue-700 space-y-1">
-          <li>• <strong>Guardar Biopsia:</strong> Guarda esta biopsia y continúa agregando más</li>
-          <li>• <strong>Finalizar Remito:</strong> Guarda esta biopsia y completa el remito del día</li>
-          <li>• Puedes modificar cualquier dato volviendo a los pasos anteriores</li>
-        </ul>
-      </div>
-
-      {/* Botones de acción */}
-      <div className="space-y-3">
-        {/* Botón para guardar solo esta biopsia */}
-        <button
-          onClick={handleSave}
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
-        >
-          <Save className="h-5 w-5" />
-          <span>💾 Guardar Biopsia</span>
-        </button>
-
-        {/* Botón para finalizar remito del día */}
-        <button
-          onClick={handleFinishDaily}
-          className="w-full bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
-        >
-          <FileText className="h-5 w-5" />
-          <span>📋 Guardar Biopsia y Finalizar Remito del Día</span>
-        </button>
-
-        {/* Botón para volver */}
-        <button
-          onClick={onPrev}
-          className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          <span>← Volver a Servicios</span>
-        </button>
-      </div>
-
-      {/* Resumen final */}
-      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-        <div className="text-center">
-          <h4 className="font-semibold text-gray-800 mb-2">📋 Resumen</h4>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-gray-600">Biopsia</p>
-              <p className="font-bold text-gray-800">#{biopsyForm.number}</p>
-            </div>
-            <div>
-              <p className="text-gray-600">Cassettes</p>
-              <p className="font-bold text-gray-800">{biopsyForm.cassettes}</p>
-            </div>
-            <div>
-              <p className="text-gray-600">Servicios</p>
-              <p className="font-bold text-gray-800">{serviciosActivos.length}</p>
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">
-            📅 {new Date().toLocaleDateString('es-AR')} • 🕐 {new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+        <div>
+          <h1 style={{
+            fontSize: '26px',
+            fontWeight: 'bold',
+            color: '#1F2937',
+            margin: '0',
+            lineHeight: '1.2'
+          }}>
+            📋 Resumen Final
+          </h1>
+          <p style={{
+            fontSize: '14px',
+            color: colors.darkGray,
+            margin: '0',
+            lineHeight: '1.3'
+          }}>
+            Revise y confirme los datos antes de guardar
           </p>
         </div>
+      </div>
+
+      {/* Contenido Principal */}
+      <div style={{
+        flex: '1',
+        padding: '15px',
+        overflowY: 'auto'
+      }}>
+        
+        {/* Header del resumen */}
+        <div style={{
+          backgroundColor: colors.white,
+          padding: '20px',
+          borderRadius: '16px',
+          border: '2px solid #E2E8F0',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+          marginBottom: '15px'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '16px'
+          }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              background: '#EBF4FF',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Eye style={{ width: '20px', height: '20px', color: colors.primaryBlue }} />
+            </div>
+            <div>
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                color: '#1F2937',
+                margin: '0'
+              }}>
+                {getTitle()}
+              </h3>
+              <p style={{
+                fontSize: '14px',
+                color: colors.darkGray,
+                margin: '0'
+              }}>
+                {getSubtitle()}
+              </p>
+            </div>
+          </div>
+
+          {/* Vista previa de la biopsia */}
+          <div style={{
+            background: '#F8FAFC',
+            padding: '20px',
+            borderRadius: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}>
+            
+            {/* Información básica */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '16px'
+            }}>
+              <div>
+                <p style={{
+                  fontSize: '12px',
+                  color: colors.darkGray,
+                  fontWeight: '500',
+                  margin: '0 0 4px 0'
+                }}>
+                  {getNumberLabel()}
+                </p>
+                <p style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: colors.primaryBlue,
+                  margin: '0'
+                }}>
+                  #{biopsyForm.number}
+                </p>
+              </div>
+              {/* ✅ MOSTRAR TIPO SOLO PARA BIOPSIAS NORMALES */}
+              {!isPapOrCitologia && (
+                <div>
+                  <p style={{
+                    fontSize: '12px',
+                    color: colors.darkGray,
+                    fontWeight: '500',
+                    margin: '0 0 4px 0'
+                  }}>
+                    Tipo
+                  </p>
+                  <p style={{
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    color: '#8B5CF6',
+                    margin: '0'
+                  }}>
+                    {biopsyForm.type}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Tejido */}
+            <div>
+              <p style={{
+                fontSize: '12px',
+                color: colors.darkGray,
+                fontWeight: '500',
+                margin: '0 0 4px 0'
+              }}>
+                {getTissueLabel()}
+              </p>
+              <p style={{
+                fontSize: '16px',
+                fontWeight: '500',
+                color: '#374151',
+                margin: '0'
+              }}>
+                {getTissueTypeDisplay()}
+              </p>
+            </div>
+
+            {/* ✅ CASSETTES/VIDRIOS Y TROZOS - SOLO PARA BIOPSIAS NORMALES */}
+            {!isPapOrCitologia && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '16px'
+              }}>
+                <div>
+                  <p style={{
+                    fontSize: '12px',
+                    color: colors.darkGray,
+                    fontWeight: '500',
+                    margin: '0 0 4px 0'
+                  }}>
+                    Cassettes
+                  </p>
+                  <p style={{
+                    fontSize: '16px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    margin: '0'
+                  }}>
+                    {biopsyForm.cassettes}
+                  </p>
+                </div>
+                {biopsyForm.pieces && (
+                  <div>
+                    <p style={{
+                      fontSize: '12px',
+                      color: colors.darkGray,
+                      fontWeight: '500',
+                      margin: '0 0 4px 0'
+                    }}>
+                      Trozos
+                    </p>
+                    <p style={{
+                      fontSize: '16px',
+                      fontWeight: '500',
+                      color: '#374151',
+                      margin: '0'
+                    }}>
+                      {biopsyForm.pieces}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ✅ MOSTRAR CANTIDAD DE VIDRIOS PARA PAP/CITOLOGÍA */}
+            {isPapOrCitologia && (
+              <div>
+                <p style={{
+                  fontSize: '12px',
+                  color: colors.darkGray,
+                  fontWeight: '500',
+                  margin: '0 0 4px 0'
+                }}>
+                  {getCassettesLabel()}
+                </p>
+                <p style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: colors.primaryBlue,
+                  margin: '0'
+                }}>
+                  {isPAPSelected ? biopsyForm.papQuantity : biopsyForm.citologiaQuantity}
+                </p>
+              </div>
+            )}
+
+            {/* ✅ MOSTRAR URGENCIA PARA PAP/CITOLOGÍA */}
+            {isPapOrCitologia && ((isPAPSelected && biopsyForm.papUrgente) || (isCitologiaSelected && biopsyForm.citologiaUrgente)) && (
+              <div>
+                <p style={{
+                  fontSize: '12px',
+                  color: colors.darkGray,
+                  fontWeight: '500',
+                  margin: '0 0 4px 0'
+                }}>
+                  Prioridad
+                </p>
+                <p style={{
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  color: '#F59E0B',
+                  margin: '0'
+                }}>
+                  ⚡ Urgente 24hs
+                </p>
+              </div>
+            )}
+
+            {/* ✅ NÚMEROS DE CASSETTES - SOLO PARA BIOPSIAS NORMALES */}
+            {!isPapOrCitologia && cassettesNumbers.length > 0 && (
+              <div>
+                <p style={{
+                  fontSize: '12px',
+                  color: colors.darkGray,
+                  fontWeight: '500',
+                  margin: '0 0 8px 0'
+                }}>
+                  Números de Cassettes
+                </p>
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '8px'
+                }}>
+                  {cassettesNumbers.map((number, index) => (
+                    <span
+                      key={index}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#EBF4FF',
+                        color: colors.primaryBlue,
+                        borderRadius: '20px',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                      }}
+                    >
+                      {number}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ✅ DESCLASIFICAR - SOLO PARA BIOPSIAS NORMALES */}
+            {!isPapOrCitologia && biopsyForm.declassify && biopsyForm.declassify !== 'No' && (
+              <div>
+                <p style={{
+                  fontSize: '12px',
+                  color: colors.darkGray,
+                  fontWeight: '500',
+                  margin: '0 0 4px 0'
+                }}>
+                  Desclasificar
+                </p>
+                <p style={{
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  color: '#F59E0B',
+                  margin: '0'
+                }}>
+                  {biopsyForm.declassify}
+                </p>
+              </div>
+            )}
+
+            {/* ✅ SERVICIOS ADICIONALES - SOLO PARA BIOPSIAS NORMALES Y SIN DUPLICADOS */}
+            {!isPapOrCitologia && serviciosActivos.length > 0 && (
+              <div>
+                <p style={{
+                  fontSize: '12px',
+                  color: colors.darkGray,
+                  fontWeight: '500',
+                  margin: '0 0 8px 0'
+                }}>
+                  Servicios Adicionales
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {serviciosActivos.map((servicio, index) => (
+                    <div key={index} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <div style={{
+                        width: '6px',
+                        height: '6px',
+                        backgroundColor: '#8B5CF6',
+                        borderRadius: '50%'
+                      }}></div>
+                      <span style={{
+                        fontSize: '14px',
+                        color: '#8B5CF6',
+                        fontWeight: '500'
+                      }}>
+                        {servicio}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Observaciones */}
+        <div style={{
+          backgroundColor: colors.white,
+          padding: '20px',
+          borderRadius: '16px',
+          border: '2px solid #E2E8F0',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+          marginBottom: '15px'
+        }}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '16px',
+              fontWeight: '600',
+              color: '#374151',
+              marginBottom: '8px'
+            }}>
+              Observaciones (Opcional)
+            </label>
+            <div 
+              onClick={handleObservationsClick}
+              style={{
+                width: '100%',
+                minHeight: '80px',
+                padding: '12px',
+                border: `2px solid ${biopsyForm.observations ? colors.primaryBlue : '#E5E7EB'}`,
+                borderRadius: '12px',
+                backgroundColor: '#F9FAFB',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                if (!biopsyForm.observations) {
+                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!biopsyForm.observations) {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                }
+              }}
+            >
+              {biopsyForm.observations ? (
+                <p style={{
+                  color: '#374151',
+                  fontSize: '14px',
+                  margin: '0'
+                }}>
+                  {biopsyForm.observations}
+                </p>
+              ) : (
+                <p style={{
+                  color: '#9CA3AF',
+                  fontSize: '14px',
+                  fontStyle: 'italic',
+                  margin: '0'
+                }}>
+                  Toca aquí para agregar observaciones...
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Información importante */}
+        <div style={{
+          backgroundColor: '#F0F9FF',
+          padding: '16px',
+          borderRadius: '12px',
+          border: '2px solid #BAE6FD',
+          marginBottom: '15px'
+        }}>
+          <h4 style={{
+            fontWeight: '600',
+            color: '#0369A1',
+            marginBottom: '8px',
+            fontSize: '16px'
+          }}>
+            ℹ️ Información importante:
+          </h4>
+          <div style={{
+            fontSize: '14px',
+            color: '#0C4A6E',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px'
+          }}>
+            <div>• <strong>Guardar {isPapOrCitologia ? (isPAPSelected ? 'PAP' : 'Citología') : 'Biopsia'}:</strong> Guarda este {isPapOrCitologia ? (isPAPSelected ? 'PAP' : 'estudio') : 'estudio'} y continúa agregando más</div>
+            <div>• <strong>Finalizar Remito:</strong> Guarda este {isPapOrCitologia ? (isPAPSelected ? 'PAP' : 'estudio') : 'estudio'} y completa el remito del día</div>
+            <div>• Puedes modificar cualquier dato volviendo a los pasos anteriores</div>
+          </div>
+        </div>
+
+        {/* Botones de acción */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* Botón para guardar solo esta biopsia */}
+          <button
+            onClick={handleSave}
+            style={{
+              width: '100%',
+              background: `linear-gradient(135deg, ${colors.primaryBlue} 0%, ${colors.darkBlue} 100%)`,
+              color: colors.white,
+              fontWeight: '600',
+              padding: '16px',
+              borderRadius: '12px',
+              border: 'none',
+              fontSize: '16px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(79, 118, 246, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            <Save style={{ width: '18px', height: '18px' }} />
+            <span>💾 Guardar {isPapOrCitologia ? (isPAPSelected ? 'PAP' : 'Citología') : 'Biopsia'}</span>
+          </button>
+
+          {/* Botón para finalizar remito del día */}
+          <button
+            onClick={handleFinishDaily}
+            style={{
+              width: '100%',
+              background: `linear-gradient(135deg, ${colors.green} 0%, #059669 100%)`,
+              color: colors.white,
+              fontWeight: '600',
+              padding: '16px',
+              borderRadius: '12px',
+              border: 'none',
+              fontSize: '16px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(81, 207, 102, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            <FileText style={{ width: '18px', height: '18px' }} />
+            <span>📋 Guardar {isPapOrCitologia ? (isPAPSelected ? 'PAP' : 'Citología') : 'Biopsia'} y Finalizar Remito del Día</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Botón de navegación hacia atrás */}
+      <div style={{
+        padding: '15px',
+        backgroundColor: colors.white,
+        borderTop: '1px solid #E2E8F0'
+      }}>
+        <button
+          onClick={onPrev}
+          style={{
+            backgroundColor: '#6B7280',
+            color: colors.white,
+            fontWeight: '600',
+            padding: '12px 20px',
+            borderRadius: '10px',
+            border: 'none',
+            fontSize: '14px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.backgroundColor = '#4B5563';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.backgroundColor = '#6B7280';
+          }}
+        >
+          <ArrowLeft style={{ width: '16px', height: '16px' }} />
+          <span>{isPapOrCitologia ? 'Volver a Tipo de Tejido' : 'Volver a Servicios'}</span>
+        </button>
       </div>
     </div>
   );

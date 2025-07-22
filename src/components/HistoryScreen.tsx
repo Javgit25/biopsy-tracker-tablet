@@ -23,29 +23,544 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
   onGoBack,
   onDeleteEntry
 }) => {
-  // Debug: Agregar logs para diagnosticar
-  React.useEffect(() => {
-    console.log('HistoryScreen - doctorInfo:', doctorInfo);
-    console.log('HistoryScreen - historyEntries:', historyEntries);
-    console.log('HistoryScreen - historyEntries.length:', historyEntries?.length);
-  }, [doctorInfo, historyEntries]);
-
   const [emailPopup, setEmailPopup] = useState<{isOpen: boolean, entry: HistoryEntry | null}>({
     isOpen: false,
     entry: null
   });
   const [emailAddress, setEmailAddress] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, entryId: string | null}>({
+    isOpen: false,
+    entryId: null
+  });
 
-  // Verificación de seguridad
+  // ✅ FUNCIÓN DE IMPRIMIR MEJORADA - FUERZA APERTURA DE VENTANA
+  const handlePrint = (entry: HistoryEntry) => {
+    console.log('🖨️ Iniciando impresión para entry:', entry.id);
+    
+    try {
+      // Primero intentar con configuración más permisiva
+      let printWindow = window.open('', 'printWindow', 'width=800,height=600,scrollbars=yes,resizable=yes');
+      
+      if (!printWindow || printWindow.closed) {
+        console.log('⚠️ Primera tentativa falló, intentando método alternativo...');
+        
+        // Intentar con un nombre específico
+        printWindow = window.open('about:blank', '_blank');
+      }
+      
+      if (!printWindow || printWindow.closed) {
+        console.log('⚠️ Segunda tentativa falló, usando iframe...');
+        
+        // Método 3: Usar iframe oculto
+        const printContent = createPrintContent(entry);
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.left = '-600px';
+        iframe.style.top = '-600px';
+        
+        document.body.appendChild(iframe);
+        
+        const iframeDoc = iframe.contentWindow?.document;
+        if (iframeDoc) {
+          iframeDoc.open();
+          iframeDoc.write(printContent);
+          iframeDoc.close();
+          
+          setTimeout(() => {
+            iframe.contentWindow?.print();
+            setTimeout(() => document.body.removeChild(iframe), 1000);
+          }, 500);
+          
+          console.log('✅ Usando método iframe para imprimir');
+          return;
+        }
+      }
+      
+      if (printWindow && !printWindow.closed) {
+        console.log('✅ Ventana de impresión abierta exitosamente');
+        
+        const printContent = createPrintContent(entry);
+        
+        printWindow.document.open();
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        
+        // Mejorar el timing de impresión
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.focus();
+            printWindow.print();
+            
+            // No cerrar automáticamente para que el usuario pueda reimprimir
+            setTimeout(() => {
+              if (!printWindow.closed) {
+                printWindow.close();
+              }
+            }, 2000);
+          }, 300);
+        };
+        
+        console.log('✅ Contenido escrito en ventana de impresión');
+      } else {
+        throw new Error('No se pudo abrir ventana de impresión');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error al imprimir:', error);
+      
+      // Último recurso: mostrar instrucciones
+      alert(`❌ Tu navegador está bloqueando ventanas emergentes.\n\n📝 INSTRUCCIONES:\n\n1. Permite ventanas emergentes para este sitio\n2. O usa Ctrl+P en esta página para imprimir\n3. O contacta soporte técnico\n\nError: ${error.message}`);
+    }
+  };
+
+  // ✅ FUNCIÓN PARA CREAR CONTENIDO DE IMPRESIÓN MÁS ROBUSTO
+  const createPrintContent = (entry: HistoryEntry): string => {
+    const biopsyRows = entry.biopsies.map((biopsy, index) => {
+      const servicios = getServiciosActivos(biopsy);
+      
+      // Escapar caracteres especiales
+      const escape = (str: any) => {
+        if (!str) return '';
+        return String(str).replace(/[<>&"']/g, (c) => {
+          const map: Record<string, string> = {'<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;', "'": '&#39;'};
+          return map[c] || c;
+        });
+      };
+      
+      return `
+        <tr style="page-break-inside: avoid;">
+          <td style="border: 1px solid #333; padding: 6px; text-align: center; font-weight: bold;">#${escape(biopsy.number)}</td>
+          <td style="border: 1px solid #333; padding: 6px;">${escape(biopsy.tissueType)}</td>
+          <td style="border: 1px solid #333; padding: 6px; text-align: center;">${escape(biopsy.type || '-')}</td>
+          <td style="border: 1px solid #333; padding: 6px; text-align: center;">
+            ${biopsy.tissueType === 'PAP' ? (biopsy.papQuantity || 0) + ' vidrios' : 
+              biopsy.tissueType === 'Citología' ? (biopsy.citologiaQuantity || 0) + ' vidrios' : 
+              (biopsy.cassettes || 0) + ' cassettes'}
+          </td>
+          <td style="border: 1px solid #333; padding: 6px; font-size: 11px;">${escape(biopsy.pieces || '-')}</td>
+          <td style="border: 1px solid #333; padding: 6px; font-size: 10px;">${escape(servicios.join(', ') || 'Ninguno')}</td>
+          <td style="border: 1px solid #333; padding: 6px; font-size: 10px;">${escape(biopsy.observations || '-')}</td>
+        </tr>
+      `;
+    }).join('');
+
+    // ✅ FORMATEAR FECHA EN ESPAÑOL
+    const formatDateInSpanish = (dateString: string) => {
+      const date = new Date(dateString);
+      const options: Intl.DateTimeFormatOptions = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      };
+      return date.toLocaleDateString('es-AR', options);
+    };
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title></title>
+  <style>
+    @page { 
+      margin: 15mm; 
+      size: A4 landscape;
+      /* ✅ ELIMINAR TODOS LOS HEADERS Y FOOTERS DEL NAVEGADOR */
+      @top-left { content: ""; }
+      @top-center { content: ""; }
+      @top-right { content: ""; }
+      @bottom-left { content: ""; }
+      @bottom-center { content: ""; }
+      @bottom-right { content: ""; }
+    }
+    
+    body { 
+      font-family: Arial, sans-serif; 
+      font-size: 11px; 
+      margin: 0; 
+      padding: 0; 
+      line-height: 1.3;
+    }
+    
+    .header { 
+      text-align: center; 
+      margin-bottom: 20px; 
+      border-bottom: 2px solid #333; 
+      padding-bottom: 10px; 
+      page-break-inside: avoid;
+    }
+    
+    .header h1 { 
+      margin: 0 0 5px 0; 
+      font-size: 22px; 
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .header .system-name { 
+      margin: 0 0 10px 0; 
+      font-size: 16px; 
+      color: #0066cc;
+      font-weight: bold;
+    }
+    
+    .header p { 
+      margin: 4px 0; 
+      font-size: 13px;
+    }
+    
+    .info { 
+      background-color: #f8f9fa; 
+      padding: 10px; 
+      margin-bottom: 15px; 
+      border-radius: 4px;
+      font-size: 12px;
+      text-align: center;
+    }
+    
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      font-size: 10px;
+      page-break-inside: auto;
+      /* ✅ ASEGURAR BORDES COMPLETOS */
+      border: 1px solid #333;
+    }
+    
+    th { 
+      background-color: #e9ecef; 
+      border: 1px solid #333; 
+      padding: 6px; 
+      text-align: center; 
+      font-weight: bold; 
+      font-size: 9px;
+      page-break-inside: avoid;
+    }
+    
+    td {
+      border: 1px solid #333;
+      padding: 6px;
+    }
+    
+    .print-btn { 
+      margin: 15px 0; 
+      text-align: center; 
+      page-break-inside: avoid;
+    }
+    
+    .print-btn button { 
+      padding: 12px 24px; 
+      font-size: 14px; 
+      background: #007bff; 
+      color: white; 
+      border: none; 
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .print-btn button:hover {
+      background: #0056b3;
+    }
+    
+    .footer { 
+      margin-top: 20px; 
+      text-align: center; 
+      font-size: 9px; 
+      color: #666; 
+      page-break-inside: avoid;
+    }
+    
+    /* ✅ ELIMINACIÓN COMPLETA DE HEADERS/FOOTERS DEL NAVEGADOR */
+    @media print { 
+      .print-btn { display: none; }
+      body { font-size: 10px; }
+      th, td { font-size: 9px; padding: 4px; }
+      
+      /* Configuración avanzada de página */
+      @page {
+        margin-top: 10mm;
+        margin-bottom: 10mm;
+        margin-left: 15mm;
+        margin-right: 15mm;
+        
+        /* Eliminar todos los contenidos automáticos */
+        @top-left-corner { content: ""; }
+        @top-left { content: ""; }
+        @top-center { content: ""; }
+        @top-right { content: ""; }
+        @top-right-corner { content: ""; }
+        @bottom-left-corner { content: ""; }
+        @bottom-left { content: ""; }
+        @bottom-center { content: ""; }
+        @bottom-right { content: ""; }
+        @bottom-right-corner { content: ""; }
+        @left-top { content: ""; }
+        @left-middle { content: ""; }
+        @left-bottom { content: ""; }
+        @right-top { content: ""; }
+        @right-middle { content: ""; }
+        @right-bottom { content: ""; }
+      }
+      
+      /* Ocultar elementos automáticos del navegador */
+      body::before,
+      body::after,
+      html::before,
+      html::after {
+        content: "" !important;
+        display: none !important;
+      }
+      
+      /* Resetear cualquier contenido automático */
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>REMITO DE BIOPSIAS</h1>
+    <p class="system-name">BiopsyTracker</p>
+    <p><strong>Dr. ${doctorInfo.firstName} ${doctorInfo.lastName}</strong></p>
+    ${doctorInfo.hospitalName ? `<p>${doctorInfo.hospitalName}</p>` : ''}
+    <p>Fecha: <strong>${formatDateInSpanish(entry.date)}</strong></p>
+  </div>
+  
+  <div class="info">
+    <strong>Total de biopsias:</strong> ${entry.biopsies.length} | 
+    <strong>Con servicios adicionales:</strong> ${entry.biopsies.filter(b => getServiciosActivos(b).length > 0).length}
+  </div>
+  
+  <div class="print-btn">
+    <button onclick="window.print(); return false;">🖨️ IMPRIMIR REMITO</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 10%;">N° Biopsia</th>
+        <th style="width: 20%;">Tipo de Tejido</th>
+        <th style="width: 8%;">Tipo</th>
+        <th style="width: 12%;">Cantidad</th>
+        <th style="width: 8%;">Trozos</th>
+        <th style="width: 22%;">Servicios</th>
+        <th style="width: 20%;">Observaciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${biopsyRows}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <p>BiopsyTracker</p>
+  </div>
+  
+  <script>
+    // ✅ CONFIGURACIÓN COMPLETA PARA ELIMINAR HEADERS/FOOTERS
+    window.onload = function() {
+      window.focus();
+      
+      // Limpiar completamente el título y URL
+      document.title = '';
+      
+      // Configurar impresión sin headers
+      if (window.print) {
+        // Intentar ocultar URL del documento
+        Object.defineProperty(document, 'URL', {
+          value: '',
+          writable: false
+        });
+        
+        // Limpiar referrer
+        Object.defineProperty(document, 'referrer', {
+          value: '',
+          writable: false
+        });
+      }
+    };
+    
+    // Función adicional para configuración de impresión
+    window.addEventListener('beforeprint', function() {
+      document.title = '';
+    });
+  </script>
+</body>
+</html>`;
+  };
+
+  // ✅ FUNCIÓN DE ELIMINAR MEJORADA CON POPUP PERSONALIZADO
+  const handleDelete = (entryId: string) => {
+    console.log('🗑️ Solicitando confirmación para eliminar ID:', entryId);
+    setDeleteConfirm({ isOpen: true, entryId });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm.entryId) return;
+    
+    console.log('🗑️ Confirmando eliminación para ID:', deleteConfirm.entryId);
+    
+    try {
+      await onDeleteEntry(deleteConfirm.entryId);
+      setDeleteConfirm({ isOpen: false, entryId: null });
+      console.log('✅ Remito eliminado exitosamente');
+      
+      // Mostrar confirmación visual
+      alert('✅ Remito eliminado del historial');
+      
+    } catch (error) {
+      console.error('❌ Error al eliminar:', error);
+      alert(`Error al eliminar el remito: ${error.message}`);
+    }
+  };
+
+  const cancelDelete = () => {
+    console.log('❌ Eliminación cancelada por el usuario');
+    setDeleteConfirm({ isOpen: false, entryId: null });
+  };
+
+  // Función para obtener servicios activos
+  const getServiciosActivos = (biopsy: BiopsyForm): string[] => {
+    const serviciosActivos: string[] = [];
+    
+    if (!biopsy.servicios) return serviciosActivos;
+
+    if (biopsy.tissueType === 'PAP') {
+      if (biopsy.papUrgente) {
+        serviciosActivos.push('PAP Urgente');
+      } else if (biopsy.papQuantity && biopsy.papQuantity > 0) {
+        serviciosActivos.push('PAP');
+      }
+      return serviciosActivos;
+    }
+
+    if (biopsy.tissueType === 'Citología') {
+      if (biopsy.citologiaUrgente) {
+        serviciosActivos.push('Citología Urgente');
+      } else if (biopsy.citologiaQuantity && biopsy.citologiaQuantity > 0) {
+        serviciosActivos.push('Citología');
+      }
+      return serviciosActivos;
+    }
+
+    Object.entries(biopsy.servicios).forEach(([key, value]) => {
+      if (value && key !== 'giemsaOptions' && key !== 'corteBlancoIHQQuantity' && key !== 'corteBlancoComunQuantity') {
+        const servicio = serviciosAdicionales.find(s => s.key === key);
+        if (servicio) {
+          let servicioLabel = servicio.label;
+          
+          if (key === 'corteBlancoIHQ') {
+            const quantity = biopsy.servicios.corteBlancoIHQQuantity || 1;
+            servicioLabel += ` (${quantity} corte${quantity !== 1 ? 's' : ''})`;
+          } else if (key === 'corteBlancoComun') {
+            const quantity = biopsy.servicios.corteBlancoComunQuantity || 1;
+            servicioLabel += ` (${quantity} corte${quantity !== 1 ? 's' : ''})`;
+          }
+          
+          if (key === 'giemsaPASMasson' && biopsy.servicios.giemsaOptions) {
+            const giemsaSelected = Object.entries(biopsy.servicios.giemsaOptions)
+              .filter(([_, selected]) => selected)
+              .map(([optionKey, _]) => {
+                const option = giemsaOptions.find(opt => opt.key === optionKey);
+                return option ? option.label : optionKey;
+              });
+            
+            if (giemsaSelected.length > 0) {
+              servicioLabel = giemsaSelected.join(', ');
+            }
+          }
+          
+          serviciosActivos.push(servicioLabel);
+        }
+      }
+    });
+
+    return serviciosActivos;
+  };
+
+  // Función para email
+  const handleEmail = (entry: HistoryEntry) => {
+    console.log('📧 Abriendo popup de email para entry:', entry.id);
+    setEmailPopup({ isOpen: true, entry });
+  };
+
+  // Función para generar CSV
+  const generateCSV = (biopsies: BiopsyForm[], doctorInfo: DoctorInfo, date: string) => {
+    const headers = [
+      'Número de Biopsia',
+      'Tipo de Tejido',
+      'Tipo (BX/PQ)',
+      'Cantidad Cassettes',
+      'Servicios Adicionales',
+      'Observaciones'
+    ];
+
+    const csvContent = [
+      `Remito del día - Dr. ${doctorInfo.firstName} ${doctorInfo.lastName}`,
+      `Fecha: ${date}`,
+      `Total de biopsias: ${biopsies.length}`,
+      '',
+      headers.join(','),
+      ...biopsies.map(biopsy => {
+        const serviciosActivos = getServiciosActivos(biopsy);
+        return [
+          biopsy.number,
+          `"${biopsy.tissueType}"`,
+          biopsy.type || '-',
+          biopsy.tissueType === 'PAP' ? biopsy.papQuantity : 
+          biopsy.tissueType === 'Citología' ? biopsy.citologiaQuantity : 
+          biopsy.cassettes,
+          `"${serviciosActivos.join(', ')}"`,
+          `"${biopsy.observations || ''}"`
+        ].join(',');
+      })
+    ].join('\n');
+
+    return csvContent;
+  };
+
+  const confirmSendEmail = () => {
+    if (!emailAddress || !emailPopup.entry) return;
+
+    try {
+      const csvContent = generateCSV(emailPopup.entry.biopsies, doctorInfo, emailPopup.entry.date);
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
+      const subject = `Remito de Biopsias - Dr. ${doctorInfo.firstName} ${doctorInfo.lastName} - ${emailPopup.entry.date}`;
+      const body = `Adjunto remito del día ${emailPopup.entry.date} con ${emailPopup.entry.biopsies.length} biopsias.\n\nDr. ${doctorInfo.firstName} ${doctorInfo.lastName}${doctorInfo.hospitalName ? `\n${doctorInfo.hospitalName}` : ''}`;
+
+      const mailtoLink = `mailto:${emailAddress}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.open(mailtoLink);
+
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Remito_${doctorInfo.firstName}_${doctorInfo.lastName}_${emailPopup.entry.date.replace(/\//g, '-')}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setEmailPopup({ isOpen: false, entry: null });
+      setEmailAddress('');
+
+      alert(`📧 Email preparado para enviar a: ${emailAddress}\n\n💾 El archivo CSV también se descargó.`);
+    } catch (error) {
+      console.error('❌ Error al enviar email:', error);
+      alert('Error al preparar el email. Por favor, intenta nuevamente.');
+    }
+  };
+
   if (!doctorInfo) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="bg-white border-b px-4 py-3">
           <div className="flex items-center space-x-3">
-            <button
-              onClick={onGoBack}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
+            <button onClick={onGoBack} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
               <ArrowLeft className="h-5 w-5 text-gray-600" />
             </button>
             <h2 className="text-lg font-semibold text-gray-800">Error</h2>
@@ -55,10 +570,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
           <h3 className="text-lg font-medium text-gray-600 mb-2">
             Error: Información del doctor no disponible
           </h3>
-          <button
-            onClick={onGoBack}
-            className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg"
-          >
+          <button onClick={onGoBack} className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg">
             Volver
           </button>
         </div>
@@ -66,392 +578,10 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
     );
   }
 
-  // historyEntries siempre debe ser un array, incluso si está vacío
   const entries = historyEntries || [];
   const sortedEntries = [...entries].sort((a, b) => 
     new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
-
-  // Función para generar CSV
-  const generateCSV = (biopsies: BiopsyForm[], doctorInfo: DoctorInfo, date: string) => {
-    const headers = [
-      'Número de Biopsia',
-      'Tipo de Tejido', 
-      'Sub-tipos Endoscopia',
-      'Tipo (BX/PQ)',
-      'Cantidad Cassettes',
-      'Números de Cassettes',
-      'Cantidad Trozos',
-      'Desclasificar',
-      'Servicios Adicionales',
-      'Observaciones',
-      'Hora de Carga',
-      'Fecha'
-    ];
-
-    const csvContent = [
-      `Remito del día - Dr. ${doctorInfo.firstName} ${doctorInfo.lastName}`,
-      doctorInfo.hospitalName ? `Hospital: ${doctorInfo.hospitalName}` : '',
-      `Fecha: ${new Date(date).toLocaleDateString('es-AR')}`,
-      `Total de biopsias: ${biopsies.length}`,
-      '',
-      headers.join(','),
-      ...biopsies.map(biopsy => {
-        const serviciosActivos: string[] = [];
-        if (biopsy.servicios) {
-          Object.entries(biopsy.servicios).forEach(([key, value]) => {
-            if (value && key !== 'giemsaOptions' && key !== 'corteBlancoIHQQuantity' && key !== 'corteBlancoComunQuantity') {
-              const servicio = serviciosAdicionales.find(s => s.key === key);
-              if (servicio) {
-                let servicioLabel = servicio.label;
-                
-                // Agregar cantidad para cortes en blanco
-                if (key === 'corteBlancoIHQ') {
-                  const quantity = biopsy.servicios.corteBlancoIHQQuantity || 1;
-                  servicioLabel += ` (${quantity} corte${quantity !== 1 ? 's' : ''})`;
-                } else if (key === 'corteBlancoComun') {
-                  const quantity = biopsy.servicios.corteBlancoComunQuantity || 1;
-                  servicioLabel += ` (${quantity} corte${quantity !== 1 ? 's' : ''})`;
-                }
-                
-                // Agregar sub-opciones de Giemsa si están seleccionadas
-                if (key === 'giemsaPASMasson' && biopsy.servicios.giemsaOptions) {
-                  const giemsaSelected = Object.entries(biopsy.servicios.giemsaOptions)
-                    .filter(([_, selected]) => selected)
-                    .map(([optionKey, _]) => {
-                      const option = giemsaOptions.find(opt => opt.key === optionKey);
-                      return option ? option.label : optionKey;
-                    });
-                  
-                  if (giemsaSelected.length > 0) {
-                    servicioLabel = `${giemsaSelected.join(', ')}`;
-                  }
-                }
-                
-                serviciosActivos.push(servicioLabel);
-              }
-            }
-          });
-        }
-        
-        // Determinar el tipo de tejido completo con sub-tipos de Endoscopia
-        let tipoTejidoCompleto = biopsy.tissueType;
-        let endoscopiaSubTypesText = '';
-        
-        if (biopsy.tissueType === 'Endoscopia' && biopsy.endoscopiaSubTypes && biopsy.endoscopiaSubTypes.length > 0) {
-          tipoTejidoCompleto = `Endoscopia`;
-          endoscopiaSubTypesText = biopsy.endoscopiaSubTypes.join(', ');
-        }
-        
-        return [
-          biopsy.number,
-          `"${tipoTejidoCompleto}"`,
-          `"${endoscopiaSubTypesText}"`,
-          biopsy.type,
-          biopsy.cassettes,
-          `"${Array.isArray(biopsy.cassettesNumbers) ? biopsy.cassettesNumbers.join(', ') : biopsy.cassettesNumbers || biopsy.number}"`,
-          biopsy.pieces,
-          biopsy.declassify,
-          `"${serviciosActivos.join(', ')}"`,
-          `"${biopsy.observations || ''}"`,
-          biopsy.timestamp ? new Date(biopsy.timestamp).toLocaleTimeString('es-AR') : '',
-          biopsy.timestamp ? new Date(biopsy.timestamp).toLocaleDateString('es-AR') : ''
-        ].join(',');
-      })
-    ].join('\n');
-
-    return csvContent;
-  };
-
-  // Función para imprimir remito
-  const printEntry = (entry: HistoryEntry) => {
-    const printContent = generatePrintableReport(entry.biopsies, doctorInfo, entry.date);
-    
-    // Crear ventana de impresión
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.print();
-      printWindow.close();
-    }
-  };
-
-  // Función para generar reporte imprimible
-  const generatePrintableReport = (biopsies: BiopsyForm[], doctorInfo: DoctorInfo, date: string) => {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Remito de Biopsias - ${new Date(date).toLocaleDateString('es-AR')}</title>
-        <style>
-          @page { 
-            margin: 20mm; 
-            size: A4;
-          }
-          
-          body { 
-            font-family: Arial, sans-serif; 
-            font-size: 11px; 
-            line-height: 1.3;
-            margin: 0;
-            padding: 0;
-          }
-          
-          .header {
-            text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 10px;
-          }
-          
-          .header h1 {
-            margin: 0;
-            font-size: 18px;
-            color: #333;
-          }
-          
-          .header p {
-            margin: 5px 0;
-            color: #666;
-          }
-          
-          .info-section {
-            margin-bottom: 15px;
-          }
-          
-          .info-section h3 {
-            margin: 0 0 8px 0;
-            font-size: 14px;
-            color: #333;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: 3px;
-          }
-          
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-            font-size: 10px;
-          }
-          
-          th, td {
-            border: 1px solid #333;
-            padding: 6px 4px;
-            text-align: left;
-            vertical-align: top;
-          }
-          
-          th {
-            background-color: #f5f5f5;
-            font-weight: bold;
-            font-size: 9px;
-            text-align: center;
-          }
-          
-          tr:nth-child(even) {
-            background-color: #f9f9f9;
-          }
-          
-          .numero { width: 8%; text-align: center; }
-          .tejido { width: 20%; }
-          .tipo { width: 6%; text-align: center; }
-          .cassettes { width: 8%; text-align: center; }
-          .nums-cassettes { width: 15%; font-family: monospace; font-size: 9px; }
-          .declasificar { width: 10%; text-align: center; }
-          .servicios { width: 25%; font-size: 9px; }
-          .observaciones { width: 18%; font-size: 9px; }
-          
-          .servicios ul {
-            margin: 0;
-            padding-left: 12px;
-            list-style-type: disc;
-          }
-          
-          .servicios li {
-            margin: 1px 0;
-          }
-          
-          .summary {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f0f0f0;
-            border-radius: 5px;
-          }
-          
-          .footer {
-            margin-top: 30px;
-            text-align: center;
-            font-size: 9px;
-            color: #666;
-            border-top: 1px solid #ccc;
-            padding-top: 10px;
-          }
-          
-          @media print {
-            body { font-size: 10px; }
-            th, td { padding: 4px 2px; font-size: 9px; }
-            .header h1 { font-size: 16px; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>REMITO DE BIOPSIAS</h1>
-          <p><strong>Dr. ${doctorInfo.firstName} ${doctorInfo.lastName}</strong></p>
-          ${doctorInfo.hospitalName ? `<p>${doctorInfo.hospitalName}</p>` : ''}
-          <p>Fecha: <strong>${new Date(date).toLocaleDateString('es-AR', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}</strong></p>
-        </div>
-
-        <div class="info-section">
-          <h3>📊 Resumen</h3>
-          <p><strong>Total de biopsias:</strong> ${biopsies.length}</p>
-          <p><strong>Con servicios adicionales:</strong> ${biopsies.filter(b => 
-            Object.values(b.servicios || {}).some(val => typeof val === 'boolean' ? val : false)
-          ).length}</p>
-          <p><strong>Generado:</strong> ${new Date().toLocaleDateString('es-AR')} a las ${new Date().toLocaleTimeString('es-AR')}</p>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th class="numero">N° Biopsia</th>
-              <th class="tejido">Tipo de Tejido</th>
-              <th class="tipo">Tipo</th>
-              <th class="cassettes">Cant. Cassettes</th>
-              <th class="nums-cassettes">N° Cassettes</th>
-              <th class="declasificar">Desclasificar</th>
-              <th class="servicios">Servicios Adicionales</th>
-              <th class="observaciones">Observaciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${biopsies.map(biopsy => {
-              // Obtener servicios activos
-              const serviciosActivos: string[] = [];
-              if (biopsy.servicios) {
-                Object.entries(biopsy.servicios).forEach(([key, value]) => {
-                  if (value && key !== 'giemsaOptions' && key !== 'corteBlancoIHQQuantity' && key !== 'corteBlancoComunQuantity') {
-                    const servicio = serviciosAdicionales.find(s => s.key === key);
-                    if (servicio) {
-                      let servicioLabel = servicio.label;
-                      
-                      // Agregar cantidad para cortes en blanco
-                      if (key === 'corteBlancoIHQ') {
-                        const quantity = biopsy.servicios.corteBlancoIHQQuantity || 1;
-                        servicioLabel += ` (${quantity} corte${quantity !== 1 ? 's' : ''})`;
-                      } else if (key === 'corteBlancoComun') {
-                        const quantity = biopsy.servicios.corteBlancoComunQuantity || 1;
-                        servicioLabel += ` (${quantity} corte${quantity !== 1 ? 's' : ''})`;
-                      }
-                      
-                      // Agregar sub-opciones de Giemsa si están seleccionadas
-                      if (key === 'giemsaPASMasson' && biopsy.servicios.giemsaOptions) {
-                        const giemsaSelected = Object.entries(biopsy.servicios.giemsaOptions)
-                          .filter(([_, selected]) => selected)
-                          .map(([optionKey, _]) => {
-                            const option = giemsaOptions.find(opt => opt.key === optionKey);
-                            return option ? option.label : optionKey;
-                          });
-                        
-                        if (giemsaSelected.length > 0) {
-                          servicioLabel = giemsaSelected.join(', ');
-                        }
-                      }
-                      
-                      serviciosActivos.push(servicioLabel);
-                    }
-                  }
-                });
-              }
-
-              // Determinar el tipo de tejido completo con sub-tipos de Endoscopia
-              let tipoTejidoCompleto = biopsy.tissueType;
-              if (biopsy.tissueType === 'Endoscopia' && biopsy.endoscopiaSubTypes && biopsy.endoscopiaSubTypes.length > 0) {
-                tipoTejidoCompleto = `${biopsy.tissueType} (${biopsy.endoscopiaSubTypes.join(', ')})`;
-              }
-
-              // Obtener números de cassettes
-              const cassettesNumbers = Array.isArray(biopsy.cassettesNumbers) 
-                ? biopsy.cassettesNumbers.join(', ') 
-                : biopsy.cassettesNumbers || biopsy.number;
-
-              return `
-                <tr>
-                  <td class="numero"><strong>#${biopsy.number}</strong></td>
-                  <td class="tejido">${tipoTejidoCompleto}</td>
-                  <td class="tipo">${biopsy.type}</td>
-                  <td class="cassettes">${biopsy.cassettes}</td>
-                  <td class="nums-cassettes">${cassettesNumbers}</td>
-                  <td class="declasificar">${biopsy.declassify || 'No'}</td>
-                  <td class="servicios">
-                    ${serviciosActivos.length > 0 ? `
-                      <ul>
-                        ${serviciosActivos.map(servicio => `<li>${servicio}</li>`).join('')}
-                      </ul>
-                    ` : '<em>Ninguno</em>'}
-                  </td>
-                  <td class="observaciones">${biopsy.observations || '-'}</td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
-
-        <div class="footer">
-          <p>Documento generado automáticamente - ${new Date().toLocaleDateString('es-AR')} ${new Date().toLocaleTimeString('es-AR')}</p>
-          <p>Sistema de Gestión de Biopsias</p>
-        </div>
-      </body>
-      </html>
-    `;
-  };
-
-  // Función para enviar por email
-  const sendByEmail = (entry: HistoryEntry) => {
-    setEmailPopup({ isOpen: true, entry });
-  };
-
-  const confirmSendEmail = () => {
-    if (!emailAddress || !emailPopup.entry) return;
-
-    const csvContent = generateCSV(emailPopup.entry.biopsies, doctorInfo, emailPopup.entry.date);
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-
-    // Crear subject y body del email
-    const subject = `Remito de Biopsias - Dr. ${doctorInfo.firstName} ${doctorInfo.lastName} - ${emailPopup.entry.date}`;
-    const body = `Adjunto remito del día ${emailPopup.entry.date} con ${emailPopup.entry.biopsies.length} biopsias.\n\nDr. ${doctorInfo.firstName} ${doctorInfo.lastName}${doctorInfo.hospitalName ? `\n${doctorInfo.hospitalName}` : ''}`;
-
-    // Abrir cliente de email
-    const mailtoLink = `mailto:${emailAddress}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.open(mailtoLink);
-
-    // También permitir descargar el archivo CSV
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Remito_${doctorInfo.firstName}_${doctorInfo.lastName}_${emailPopup.entry.date.replace(/\//g, '-')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setEmailPopup({ isOpen: false, entry: null });
-    setEmailAddress('');
-
-    alert(`📧 Email preparado para enviar a: ${emailAddress}\n\n💾 El archivo CSV también se descargó para adjuntar manualmente si es necesario.`);
-  };
-
-  const closeEmailPopup = () => {
-    setEmailPopup({ isOpen: false, entry: null });
-    setEmailAddress('');
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -459,10 +589,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
       <div className="bg-white border-b px-4 py-3">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-3">
-            <button
-              onClick={onGoBack}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
+            <button onClick={onGoBack} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
               <ArrowLeft className="h-5 w-5 text-gray-600" />
             </button>
             <div>
@@ -492,20 +619,14 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
             <p className="text-gray-500 mb-4">
               Los remitos finalizados aparecerán aquí
             </p>
-            <button
-              onClick={onGoBack}
-              className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg"
-            >
+            <button onClick={onGoBack} className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg">
               Volver al Inicio
             </button>
           </div>
         ) : (
           <div className="space-y-4">
             {sortedEntries.map((entry) => (
-              <div
-                key={entry.id}
-                className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm"
-              >
+              <div key={entry.id} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                 {/* Header del remito */}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-3">
@@ -541,65 +662,24 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
                     <div>
                       <p className="text-gray-600">Con Servicios</p>
                       <p className="text-lg font-bold text-gray-800">
-                        {entry.biopsies.filter(b => 
-                          Object.values(b.servicios || {}).some(val => 
-                            typeof val === 'boolean' ? val : false
-                          )
-                        ).length}
+                        {entry.biopsies.filter(b => getServiciosActivos(b).length > 0).length}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Preview de biopsias - ACTUALIZADO */}
+                {/* Preview de biopsias */}
                 {entry.biopsies.length > 0 && (
                   <div className="bg-blue-50 p-3 rounded-lg mb-3">
                     <p className="text-xs text-blue-800 font-medium mb-2">📋 Biopsias incluidas:</p>
                     <div className="space-y-1">
                       {entry.biopsies.slice(0, 3).map((biopsy, index) => {
-                        // Obtener servicios adicionales
-                        const serviciosActivos: string[] = [];
-                        if (biopsy.servicios) {
-                          Object.entries(biopsy.servicios).forEach(([key, value]) => {
-                            if (value && key !== 'giemsaOptions' && key !== 'corteBlancoIHQQuantity' && key !== 'corteBlancoComunQuantity') {
-                              const servicio = serviciosAdicionales.find(s => s.key === key);
-                              if (servicio) {
-                                let servicioLabel = servicio.label;
-                                
-                                // Agregar cantidad para cortes en blanco
-                                if (key === 'corteBlancoIHQ') {
-                                  const quantity = biopsy.servicios.corteBlancoIHQQuantity || 1;
-                                  servicioLabel += ` (${quantity})`;
-                                } else if (key === 'corteBlancoComun') {
-                                  const quantity = biopsy.servicios.corteBlancoComunQuantity || 1;
-                                  servicioLabel += ` (${quantity})`;
-                                }
-                                
-                                // Agregar sub-opciones de Giemsa si están seleccionadas
-                                if (key === 'giemsaPASMasson' && biopsy.servicios.giemsaOptions) {
-                                  const giemsaSelected = Object.entries(biopsy.servicios.giemsaOptions)
-                                    .filter(([_, selected]) => selected)
-                                    .map(([optionKey, _]) => {
-                                      const option = giemsaOptions.find(opt => opt.key === optionKey);
-                                      return option ? option.label : optionKey;
-                                    });
-                                  
-                                  if (giemsaSelected.length > 0) {
-                                    servicioLabel = giemsaSelected.join(', ');
-                                  }
-                                }
-                                
-                                serviciosActivos.push(servicioLabel);
-                              }
-                            }
-                          });
-                        }
-
+                        const serviciosActivos = getServiciosActivos(biopsy);
                         return (
                           <div key={index} className="bg-white p-2 rounded border">
                             <div className="flex justify-between items-start text-xs mb-1">
                               <span className="text-blue-700 font-medium">#{biopsy.number}</span>
-                              <span className="text-blue-500">{biopsy.type}</span>
+                              <span className="text-blue-500">{biopsy.type || '-'}</span>
                             </div>
                             <div className="text-xs text-blue-600 mb-1">
                               <span className="font-medium">{biopsy.tissueType}</span>
@@ -608,7 +688,17 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
                               )}
                             </div>
                             <div className="flex justify-between items-center text-xs">
-                              <span className="text-blue-600">Cassettes: <strong>{biopsy.cassettes}</strong></span>
+                              <span className="text-blue-600">
+                                {biopsy.tissueType === 'PAP' || biopsy.tissueType === 'Citología' ? 'Vidrios' : 'Cassettes'}: 
+                                <strong>
+                                  {biopsy.tissueType === 'PAP' 
+                                    ? biopsy.papQuantity 
+                                    : biopsy.tissueType === 'Citología' 
+                                      ? biopsy.citologiaQuantity 
+                                      : biopsy.cassettes
+                                  }
+                                </strong>
+                              </span>
                               {serviciosActivos.length > 0 && (
                                 <span className="text-purple-600">🔧 {serviciosActivos.length} servicio{serviciosActivos.length !== 1 ? 's' : ''}</span>
                               )}
@@ -632,27 +722,30 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
                   </div>
                 )}
 
-                {/* Acciones */}
+                {/* ✅ BOTONES MEJORADOS */}
                 <div className="flex space-x-2">
                   <button
-                    onClick={() => printEntry(entry)}
+                    onClick={() => handlePrint(entry)}
                     className="flex-1 flex items-center justify-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg transition-colors text-sm"
+                    type="button"
                   >
                     <Printer className="h-4 w-4" />
                     <span>Imprimir</span>
                   </button>
                   
                   <button
-                    onClick={() => sendByEmail(entry)}
+                    onClick={() => handleEmail(entry)}
                     className="flex-1 flex items-center justify-center space-x-2 bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg transition-colors text-sm"
+                    type="button"
                   >
                     <Mail className="h-4 w-4" />
                     <span>Email</span>
                   </button>
                   
                   <button
-                    onClick={() => onDeleteEntry(entry.id)}
+                    onClick={() => handleDelete(entry.id)}
                     className="flex items-center justify-center bg-red-500 hover:bg-red-600 text-white py-2 px-3 rounded-lg transition-colors"
+                    type="button"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -662,6 +755,42 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
           </div>
         )}
       </div>
+
+      {/* ✅ POPUP DE CONFIRMACIÓN DE ELIMINAR PERSONALIZADO */}
+      {deleteConfirm.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-sm">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Trash2 className="h-6 w-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                ¿Eliminar Remito?
+              </h3>
+              <p className="text-sm text-gray-600">
+                Esta acción no se puede deshacer. El remito será eliminado permanentemente del historial.
+              </p>
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={cancelDelete}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg transition-colors font-medium"
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg transition-colors font-medium"
+                type="button"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Popup de Email */}
       {emailPopup.isOpen && emailPopup.entry && (
@@ -695,8 +824,9 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
 
             <div className="flex space-x-3">
               <button
-                onClick={closeEmailPopup}
+                onClick={() => setEmailPopup({ isOpen: false, entry: null })}
                 className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg transition-colors"
+                type="button"
               >
                 Cancelar
               </button>
@@ -708,6 +838,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
                     ? 'bg-green-500 hover:bg-green-600 text-white'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
+                type="button"
               >
                 Enviar
               </button>

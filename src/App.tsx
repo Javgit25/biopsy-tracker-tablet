@@ -330,7 +330,7 @@ function App() {
     setTodayBiopsies([]);
   }, [doctorInfo, todayBiopsies, generateDoctorKey]);
 
-  // Función para guardar remitos en el almacén del administrador - CORREGIDA
+  // ✅ FUNCIÓN MODIFICADA - Guardar remitos en el almacén del administrador con cantidades PAP y Citología
   const saveRemitosToAdmin = useCallback((remito: HistoryEntry) => {
     try {
       const adminRemitos = JSON.parse(localStorage.getItem('adminRemitos') || '[]');
@@ -364,7 +364,10 @@ function App() {
             cassettes: parseInt(biopsy.cassettes) || 0,
             trozos: parseInt(biopsy.pieces) || 0,
             desclasificar: biopsy.declassify === 'Sí' ? 'Sí' : 'No',
-            servicios: servicios
+            servicios: servicios,
+            // ✅ NUEVOS CAMPOS AGREGADOS PARA MANEJAR CANTIDADES:
+            papQuantity: biopsy.papQuantity || 0,           // Cantidad de PAP
+            citologiaQuantity: biopsy.citologiaQuantity || 0 // Cantidad de vidrios de citología
           };
         }),
         estado: 'pendiente',
