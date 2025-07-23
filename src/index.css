@@ -1,3 +1,234 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Estilos optimizados para tablet 22cm x 14cm */
+:root {
+  --tablet-height: 22cm;
+  --tablet-width: 14cm;
+  --min-touch-target: 44px; /* Tamaño mínimo recomendado para táctil */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Eliminar scroll global */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-size: 16px; /* Tamaño base para buena legibilidad en tablet */
+  user-select: none; /* Evitar selección accidental de texto */
+  -webkit-user-select: none;
+  -webkit-touch-callout: none; /* Desactivar menú contextual en iOS */
+}
+
+/* Contenedor principal de la app */
+.app-container {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Botones optimizados para táctil */
+.touch-button {
+  min-height: var(--min-touch-target);
+  min-width: var(--min-touch-target);
+  padding: 12px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  touch-action: manipulation; /* Mejorar respuesta táctil */
+}
+
+.touch-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.touch-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Inputs optimizados para táctil */
+.touch-input {
+  min-height: var(--min-touch-target);
+  padding: 12px 16px;
+  font-size: 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.touch-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Layout de grilla para contenido sin scroll */
+.grid-layout {
+  display: grid;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Header fijo */
+.header-fixed {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 12px 20px;
+  min-height: 60px;
+}
+
+/* Área de contenido principal */
+.content-area {
+  flex: 1;
+  overflow: hidden;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Grid de botones para pantalla principal */
+.main-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  height: 100%;
+  max-height: calc(100vh - 140px); /* Reservar espacio para header */
+}
+
+/* Cards de acción */
+.action-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  border: 2px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 200px;
+  touch-action: manipulation;
+}
+
+.action-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+}
+
+/* Formularios paso a paso */
+.step-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.step-content {
+  flex: 1;
+  overflow: hidden;
+  padding: 20px 0;
+}
+
+.step-navigation {
+  padding: 20px 0;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Filas de formulario optimizadas */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 20px;
+  min-height: var(--min-touch-target);
+}
+
+/* Lista de elementos sin scroll */
+.fixed-list {
+  display: grid;
+  gap: 12px;
+  max-height: calc(100vh - 200px);
+  overflow: hidden;
+}
+
+/* Teclado virtual mejorado */
+.virtual-keyboard {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 2px solid #e5e7eb;
+  padding: 16px;
+  z-index: 100;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Animaciones suaves */
+@keyframes slideIn {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Scrolling específico cuando sea necesario */
+.custom-scroll {
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.custom-scroll::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Estados de loading y feedback */
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

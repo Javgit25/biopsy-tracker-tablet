@@ -18,20 +18,13 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
   autoCompleteOptions = [],
   onSelectAutoComplete
 }) => {
-  // 🔧 FUNCIÓN MEJORADA: Selecciona sugerencia Y cierra teclado automáticamente
   const handleSelectAutoComplete = (option: string) => {
-    console.log('🎹 VirtualKeyboard - Seleccionando sugerencia:', option);
-    
-    // Primero ejecutar la selección
     if (onSelectAutoComplete) {
       onSelectAutoComplete(option);
     }
-    
-    // Luego cerrar el teclado automáticamente
     setTimeout(() => {
-      console.log('🎹 VirtualKeyboard - Cerrando teclado automáticamente');
       onConfirm();
-    }, 150); // Pequeño delay para asegurar que se procese la selección
+    }, 150);
   };
 
   if (keyboard.type === 'numeric') {
@@ -43,55 +36,55 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
     ];
 
     return (
-      <div className="bg-white border-t border-gray-200 p-4">
-        <div className="max-w-sm mx-auto">
-          <div className="mb-3">
+      <div className="virtual-keyboard slide-in">
+        <div className="max-w-lg mx-auto">
+          <div className="mb-4">
             <input
               type="text"
               value={keyboard.targetValue}
               readOnly
-              className="w-full px-4 py-3 text-lg border border-gray-300 rounded-lg bg-gray-50 text-center font-mono"
+              className="w-full px-4 py-4 text-xl border-2 border-gray-300 rounded-lg bg-gray-50 text-center font-mono"
               placeholder="Ingrese número..."
             />
           </div>
           
-          <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="grid grid-cols-3 gap-3 mb-4">
             {numericKeys.flat().map((key) => (
               <button
                 key={key}
                 onClick={() => onKeyPress(key)}
-                className="bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold py-4 px-4 rounded-lg text-lg transition-colors"
+                className="touch-button bg-blue-100 text-blue-800 hover:bg-blue-200 text-xl font-semibold h-16"
               >
                 {key}
               </button>
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="grid grid-cols-2 gap-3 mb-4">
             <button
               onClick={() => onKeyPress('backspace')}
-              className="bg-red-100 hover:bg-red-200 text-red-800 font-semibold py-3 px-4 rounded-lg transition-colors"
+              className="touch-button bg-red-100 text-red-800 hover:bg-red-200"
             >
               ← Borrar
             </button>
             <button
               onClick={() => onKeyPress('clear')}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-3 px-4 rounded-lg transition-colors"
+              className="touch-button bg-gray-100 text-gray-800 hover:bg-gray-200"
             >
               Limpiar
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => onSwitchType('full')}
-              className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-medium py-3 px-4 rounded-lg transition-colors text-sm"
+              className="touch-button bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
             >
               ABC Teclado
             </button>
             <button
               onClick={onConfirm}
-              className="bg-green-100 hover:bg-green-200 text-green-800 font-semibold py-3 px-4 rounded-lg transition-colors"
+              className="touch-button bg-green-100 text-green-800 hover:bg-green-200"
             >
               ✓ Confirmar
             </button>
