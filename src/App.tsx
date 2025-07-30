@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { DoctorInfo, BiopsyForm, SyncAction, HistoryEntry } from './types';
-import { LoginScreen } from './components/LoginScreen';
-import { MainScreen } from './components/MainScreen';
-import { NewBiopsyScreen } from './components/NewBiopsyScreen';
-import { TodayListScreen } from './components/TodayListScreen';
-import { HistoryScreen } from './components/HistoryScreen';
-import { AdminPanel } from './components/AdminPanel';
+import LoginScreen from './components/LoginScreen';
+import MainScreen from './components/MainScreen';
+import NewBiopsyScreen from './components/NewBiopsyScreen';
+import TodayListScreen from './components/TodayListScreen';
+import HistoryScreen from './components/HistoryScreen';
+import AdminPanel from './components/AdminPanel';
 
 type ScreenType = 'login' | 'main' | 'newBiopsy' | 'todayList' | 'history' | 'admin';
 
